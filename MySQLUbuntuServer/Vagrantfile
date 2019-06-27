@@ -1,0 +1,24 @@
+$script = <<-SCRIPT
+apt -q update -y
+apt -q install -y python2.7 python-pip python-apt aptitude
+SCRIPT
+
+Vagrant.configure("2") do | config |
+    config.vm.box = "ubuntu/bionic64"
+    config.vm.provider "virtualbox" do |v|
+        v.name = "testvm"
+    end
+    config.vm.network :private_network, ip: "192.168.12.10"
+    config.vm.provision "shell", inline: $script
+    config.vm.provision "ansible_local" do |ansible|
+        ansible.playbook = "playbook.yml"
+        ansible.become = true
+        ansible.verbose = true
+        ansible.config_file = "ansible.cfg"
+        ansible.host_vars = {
+            "all" => {
+                "ansible_python_interpreter": "/usr/bin/python2"
+            }
+        }
+    end
+end

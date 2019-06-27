@@ -1,0 +1,74 @@
+---
+- hosts: all
+  vars:
+    db_root_password: "password1234"
+    db_password: "password1234"
+  become: yes
+  tasks:
+    - name: Update APT cache
+      apt:
+        update_cache: yes
+
+    - name: Install MySQL
+      apt:
+        name: "{{ packages }}"
+      vars:
+        packages:
+            - mysql-server-5.7
+            - default-libmysqlclient-dev
+
+    - name: Install Python MySQL Module
+      pip:
+        name: MySQL-Python
+ 
+    - name: Set Root Password
+      mysql_user: user=root password="{{ db_root_password }}" host=localhost
+
+    - name: Remove anonymous users for localhost
+      mysql_user: login_user="root" login_password="{{ db_root_password }}" user="" state="absent"
+
+    - name: Securing root user for localhost
+      mysql_user: login_user="root" login_password="{{ db_root_password }}" user="root" password="{{ db_root_password }}" host="127.0.0.1"
+
+    - name: Securing root user for localhost domain
+      mysql_user: login_user="root" login_password="{{ db_root_password }}" user="root" password="{{ db_root_password }}" host="localhost"   
+
+    - name: Removing Test Database
+      mysql_db: login_user=root login_password="{{ db_root_password }}" db=test state=absent
+
+    - name: Change mysql config
+      shell: sed -i "s/bind-address.*/bind-address = 0.0.0.0/g" /etc/mysql/mysql.conf.d/mysqld.cnf
+      become: yes
+
+    - name: ufw config
+      shell: ufw allow mysql
+      become: yes
+
+    - name: Restart MySQL
+      service:
+        name: mysql
+        state: restarted
+      become: yes
+
+    - name: Restart ufw
+      service:
+        name: ufw
+        state: restarted
+      become: yes
+
+    - name: Modify ip tables INPUT
+      iptables:
+        chain: INPUT
+        protocol: TCP
+        destination_port: 3306
+        ctstate: NEW,ESTABLISHED
+        jump: ACCEPT
+        
+    - name: Modify ip tables OUTPUT
+      iptables:
+        chain: OUTPUT
+        protocol: TCP
+        source_port: 3306
+        ctstate: ESTABLISHED
+        jump: ACCEPT
+      become: yes
